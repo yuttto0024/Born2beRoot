@@ -117,7 +117,7 @@ Debianのパッケージ管理システムにおいて、aptは標準的なイ�
 
 ### 1. 仮想ドライブのセットアップ
 物理マシンの中に、ソフトウェアで再現した仮想のハードウェアを作成する工程。
-- **OS: Debian**
+- **OS: Debian**  
   debian13-2-0-amd6を使用。CentOSと比較してパッケージ管理が容易で、初心者向けのドキュメントが豊富なため。
 - **Firmware: Legacy BIOS**  
 本課題のパーティション構成（MBR方式）に合わせるため。EFIを有効にするとパーティション設計が複雑化するため、学習目的ではレガシーBIOSの方が構造を理解しやすい。
@@ -153,12 +153,28 @@ Debianのパッケージ管理システムにおいて、aptは標準的なイ�
 ### ユーザー、グループ周り
 - sudoインストール:```apt install sudo```、デバッグ:```sudo --version```
 - ユーザー作成：```sudo adduser <username>```、デバッグ：```getent passwd <username>```
-- グループ作成（sudo addgroup ~~, デバッグ：getent group <groupname>）
-- グループに追加（sudo adduser <username> <groupname>）
+- グループ作成：```sudo addgroup <groupname>```、デバッグ：```getent group <groupname>```
+- グループに追加：```sudo adduser <username> <groupname>```  
 ### sshインストールと設定
-- apt install sshで入れた（デバッグ：systemctl status ssh）
-- /etc/ssh/sshd_config のPort番号変更、SSH経由のrootログイン禁止（デバッグ：sysctl + restart）
-- 外部からポート番号 + ユーザーログイン（ssh yuonishi@localhost -p 4242）
+1. Concept：セットアップとサーバーデーモンの区別
+- /etc/ssh/ssh_config (Client Side)
+  自分が他のサーバーへ接続しに行く時の設定。
+- /etc/ssh/sshd_config (Server Daemon Side)
+  外部からの接続を受け入れる時の設定。Debianをサーバーとして機能させるための設定。
+- インストール + 有効化：```sudo apt install openssh-server``` デバッグ：```systemctl status ssh```
+2. Configuration  
+  デーモンにセキュリティを設定する：```sudo vim /etc/ssh/sshd_config```
+- Port 4242：デフォルトの22番は狙われやすいため変更。
+- PermitRootLogin no  
+  Rootがログインするのは危険。「一般ユーザー」としてログインさせ、必要な時だけ sudo させることで、「誰が操作したか」のログを確実に残す。
+3. 設定ファイル適用：```sudo systemctl restart ssh```  
+  デーモンは起動時にしか設定ファイルを読まないため、書き換えたら再起動して読み直させる。
+4. Port Forwarding
+  仮想マシンは「ホストPCの中の隔離された箱」にあるため、そのままでは外から繋がらない。VirtualBoxの設定で、ホストとゲストの間にパイプを通す。
+- Host: 4242 → Guest: 4242  
+  「ホストの4242番ポートに来た通信を、そのままゲストの4242番に転送しろ」という命令。
+5. Connection：```ssh yuonishi@localhost -p 4242```、デバッグ：```ssh root@localhost -p 4242```  
+  ホストマシンのターミナルから、実際に接続して確認する。
 
 ### ufwインストールと設定
 - インストール + 有効化
@@ -180,17 +196,15 @@ Debianのパッケージ管理システムにおいて、aptは標準的なイ�
 2. ポートは開いてるか：``` lsof/ ss ```
 3. firewall 通してるか：``` ufw status ```
 
-## sudoポリシー
+### sudoポリシー
 ココでは、メインの設定ファイル（/etc/sudoers）を直接編集せず、/etc/sudoers.d/ ディレクトリ内に専用のファイルを作成して管理している。
-### ファイル構造
-- Config file：```/etc/sudoers.d/sudo_config```
-- Config file：```/var/log/sudo/```
-- sudoers.dというsudoサービスの常駐プロセスの設定用のファイルを作成（touch /etc/sudoers.d/sudo_config）
-- mkdir /var/log/sudo（varに記録残して、sudoは、管理者権限を実行かつ、実行下ユーザーのログを残すシステム）
-- sudoの設定（sudo visudo -f /etc/sudoers.d/sudo_config）
-sudoの設定、特にrootユーザーのパスワードが無効化した状態でsudoが壊れると、管理者権限になれなくなり修正不能。
-visudoは、保存前に文法チェックが走る。
-sudo visudoを打つと自動でメインの設定ファイル（/etc/sudoers）を開くため、-fフラグ
+- ファイル構造
+  - Config file：```/etc/sudoers.d/sudo_config```
+  - Config file：```/var/log/sudo/```
+  - sudoers.dというsudoサービスの常駐プロセスの設定用のファイルを作成（touch /etc/sudoers.d/sudo_config）
+  - mkdir /var/log/sudo（varに記録残して、sudoは、管理者権限を実行かつ、実行下ユーザーのログを残すシステム）
+  - sudoの設定（sudo visudo -f /etc/sudoers.d/sudo_config）
+    sudoの設定、特にrootユーザーのパスワードが無効化した状態でsudoが壊れると、管理者権限になれなくなり修正不能。visudoは、保存前に文法チェックが走る。sudo visudoを打つと自動でメインの設定ファイル（/etc/sudoers）を開くため、-fフラグをつける。
 ```sh
 Defaults	passwd_tries=3
 Defaults	badpass_message="Wrong Password!!"
@@ -222,46 +236,64 @@ Defaults	secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/b
     ```
 
 ### パスワードポリシー
-- パスワードの有効期限編集
-- パスワードモジュールPAMのインストール（デバッグ：passwdでパスワード変更）
+1. Password Age（/etc/login.defs）
+パスワードの「有効期限」に関する設定。一度設定したパスワードを使わせないためのルール。
+- 30日ごとに変更を強制：```PASS_MAX_DAYS 30```
+- 最低2日間は変更不可：```PASS_MIN_DAYS 2```
+- 期限切れの7日前から警告を出す：```PASS_WARN_AGE 7```
+2. Password Complexity (PAM)```/etc/pam.d/common-password```
+パスワードの「強度（複雑さ）」に関する設定。 標準機能だけでは「大文字必須」などの細かい制限ができないため、専用のモジュールを追加する。```apt install libpam-pwquality```
+- retry=3 の後ろに以下を追記
+```sh
+minlen=10 #最低10文字
+ucredit=-1 #大文字を最低1文字含む
+dcredit=-1 #数字を最低1文字含む
+lcredit=-1 #小文字を最低1文字含む
+maxrepeat=3 #同じ文字を3回以上連続させない
+difok=7 #変更前のパスワードと7文字以上異なっていること
+reject_username #ユーザー名を含んでいたら拒否
+enforce_for_root #このルールをRootユーザーにも強制する
+```
+- デバッグ：```passwd```
 ## Phase3
 ### System Monitoring Script (monitoring.sh)
-ここでは、以下のシステム情報を収集し、全端末に通知するBashスクリプトを作成。
-アドレス：/var/log/sudo/sudo_config
-- 1. Architecture
-uname -a（Unix Name）コマンドを使用し、os名、カーネルバージョン、ハードウェアアーキテクチャ等のシステムの基本情報を網羅的に表示。
-- 2. CPU Physical
-/proc/cpuinfo ファイルから physical id エントリを検索し、その数をカウントすることで物理プロセッサの数を算出。
-- 3. vCPU
-/proc/cpuinfo ファイル内の processor エントリの行数をカウントし、OSが認識している論理コア（スレッド）の総数を算出。
-- 4. Memory Usage (RAM)
-free -m コマンドでメモリ情報をMB単位で取得し、awkで使用量と合計値から使用率（％）を計算・整形。
-- 5. Disk Usage
-df -m コマンドでファイルシステムのディスク容量をMB単位で取得。grep "^/dev/" を用いて物理デバイスおよびLVMパーティションのみを抽出し、awk でシステム全体の「使用量」と「合計容量」を合算。課題の出力例（Used/TotalGb）に従い、合計容量のみGB単位に変換して整形・表示。
-- 6. CPU Load
-top -bn1 コマンドを使用して、その瞬間のプロセスのスナップショットを取得。grep でCPU情報の行を抽出し、awk を用いて ユーザープロセス（$2） と システムプロセス（$4） の使用率を合算して表示。
-- 7. Last boot
-システムの最終起動日時を取得するため uptime -s コマンドを使用。who -b コマンドは出力形式が変動するため、安定したフォーマット（YYYY-MM-DD HH:MM:SS）を提供する uptime -s を採用、awkで秒数を除去しています。
-- 8. LVM use
-lsblk コマンドを使用してブロックデバイス一覧を取得し、grep で "lvm" タイプが含まれる行数をカウント。その結果を基に if 文で条件分岐を行い、LVMが有効な場合は "yes"、無効な場合は "no" を表示。
-- 9. Connection
-ss コマンド（従来の netstat の代替）を使用してソケット統計を取得し、grep で "ESTAB"（確立済み）の状態にあるTCP接続を抽出。その行数をカウントして表示。
-- 10. User log
-users コマンドで現在ログインしているユーザーの一覧を取得し、wc -w（ワードカウント）を用いてユーザー数を算出。
-- 11. Network
-hostname -I コマンドでIPアドレスを取得し、ip link コマンドから grep と awk を用いてMACアドレス（Ethernetアドレス）を抽出。これらを組み合わせて表示しています。
-- 12. Sudo
-Sudoのログファイル（/var/log/sudo/sudo_config）内に記録された "COMMAND" という文字列を含む行を grep で検索し、その行数を wc -l でカウントすることで、Sudoコマンドの実行総数を算出。
----
-- wall
-echo ""メッセージをwallに渡す。wallは、ログインしている全員の画面にブロードキャストする。
-## Systemd Timer
+ここでは、以下のシステム情報を収集し、全端末に通知するBashスクリプトを作成。   
+アドレス：```/var/log/sudo/sudo_config```
+1. Architecture  
+  ```uname -a```（Unix Name）コマンドを使用し、os名、カーネルバージョン、ハードウェアアーキテクチャ等のシステムの基本情報を網羅的に表示。
+2. CPU Physical  
+  /proc/cpuinfo ファイルから physical id エントリを検索し、その数をカウントすることで物理プロセッサの数を算出。
+3. vCPU  
+  /proc/cpuinfo ファイル内の processor エントリの行数をカウントし、OSが認識している論理コア（スレッド）の総数を算出。
+4. Memory Usage (RAM)  
+  ```free -m``` コマンドでメモリ情報をMB単位で取得し、awkで使用量と合計値から使用率（％）を計算・整形。
+5. Disk Usage  
+  ```df -m``` コマンドでファイルシステムのディスク容量をMB単位で取得。```grep "^/dev/"``` を用いて物理デバイスおよびLVMパーティションのみを抽出し、```awk``` でシステム全体の「使用量」と「合計容量」を合算。課題の出力例（Used/TotalGb）に従い、合計容量のみGB単位に変換して整形・表示。
+6. CPU Load  
+  ```top -bn1``` コマンドを使用して、その瞬間のプロセスのスナップショットを取得。```grep``` でCPU情報の行を抽出し、```awk``` を用いて ユーザープロセス（$2） と システムプロセス（$4） の使用率を合算して表示。
+7. Last boot  
+  システムの最終起動日時を取得するため ```uptime -s``` コマンドを使用。```who -b``` コマンドは出力形式が変動するため、安定したフォーマット（YYYY-MM-DD HH:MM:SS）を提供する ```uptime -s``` を採用、```awk```で秒数を除去しています。
+8. LVM use  
+  ```lsblk``` コマンドを使用してブロックデバイス一覧を取得し、```grep``` で "lvm" タイプが含まれる行数をカウント。その結果を基に if 文で条件分岐を行い、LVMが有効な場合は "yes"、無効な場合は "no" を表示。
+9. Connection  
+  ```ss``` コマンドを使用してソケット統計を取得し、```grep``` で "ESTAB"（確立済み）の状態にあるTCP接続を抽出。その行数をカウントして表示。
+10. User log  
+  ```users``` コマンドで現在ログインしているユーザーの一覧を取得し、```wc -w```を用いてユーザー数を算出。
+11. Network  
+  ```hostname -I``` コマンドでIPアドレスを取得し、```ip link``` コマンドから ```grep``` と ```awk``` を用いてMACアドレス（Ethernetアドレス）を抽出。これらを組み合わせて表示しています。
+12. Sudo  
+  Sudoのログファイル（/var/log/sudo/sudo_config）内に記録された "COMMAND" という文字列を含む行を ```grep``` で検索し、その行数を ```wc -l``` でカウントすることで、Sudoコマンドの実行総数を算出。
+13. wall  
+  ```echo ""```メッセージを```wall```に渡す。```wall```は、ログインしている全員の画面にブロードキャストする。
+## Phase4
+### Systemd Timer
 - cron vs systemd timer
-cron: 時計を見て動き、10:08に起動した場合、最初の実行は10:10
-systemed timer: 10:08に起動した場合、最初の実行は10:18
+  - cron：時計を見て動き、10:08に起動した場合、最初の実行は10:10。
+  - systemed timer：10:08に起動した場合、最初の実行は10:18。　　
+    SystemdはOSの起動プロセスそのものを管理しているため、「OSが立ち上がった瞬間」 を基準に物事を進めるのが得意
 ### systemd Timer の仕組み
-Systemdは 「実行する役割（Service）」 と 「時間を計る役割（Timer）」 を明確に分ける設計思想
-Systemdで定期実行するには、2つのファイルをペアで作る必要があります。
+Systemdは 「実行する役割（Service）」 と 「時間を計る役割（Timer）」 を明確に分ける設計思想。
+Systemdで定期実行するには、2つのファイルをペアで作る必要がある。
 - monitoring.service （実行係 / Worker）
   - 何を実行するかだけを知っている。
   - スクリプトのパス、実行権限、プロセスの種類など。
@@ -270,37 +302,39 @@ Systemdで定期実行するには、2つのファイルをペアで作る必要
   - 「いつ」実行係を呼び出すかだけを知っている。
   - 起動してからの時間、繰り返し間隔など。
   - 時間が来たら monitoring.service のスイッチを押すだけ。
-「Timerファイルが時間を計り、時間になったらServiceファイルを呼び出す
-SystemdはOSの起動プロセスそのものを管理しているため、「OSが立ち上がった瞬間」 を基準に物事を進めるのが得意
-Systemdの設定ファイルは「INIファイル形式」という古いルールを採用しており、「セクション（章）」 で区切らないと読み取ってくれません。
-[Unit]: ファイルの説明や依存関係を書く場所
-- [Service]: 実行に関する設定を書く場所。
-- [Timer]: 時間に関する設定を書く場所。
+Timerファイルが時間を計り、時間になったらServiceファイルを呼び出す。
+Systemdの設定ファイルは「INIファイル形式」という古いルールを採用しており、セクション で区切らないと読み取ってくれない。
+- [Unit]： ファイルの説明や依存関係を書く場所。
+- [Service]： 実行に関する設定を書く場所。
+- [Timer]： 時間に関する設定を書く場所。
 - [Install]: enable した時の登録先を書く場所。
-各変数は予約語
-sudo vim /etc/systemd/system/monitoring.service
+
+### monitoring.service  
+アドレス：/etc/systemd/system/monitoring.service
 ```sh
-#このサービスの説明。ログなどで表示されます。
 Description=Monitoring Script Service
 #実行するスクリプトの絶対パス。
 ExecStart=/usr/local/bin/monitoring.sh
-# 常駐」せず、スクリプトが終わったらプロセスも終了させる設定。
-# これがないと「実行中」の状態が続き、タイマーが次を呼べなくなる。
+# 常駐せず、スクリプトが終わったらプロセスも終了させる。これがないと「実行中」の状態が続き、タイマーが次を呼べなくなる。
 Type=oneshot
 ```
-sudo vim /etc/systemd/system/monitoring.timer
+### monitoring.timer
+アドレス：/etc/systemd/system/monitoring.timer
 ```sh
 Description=Run monitoring script every 10 minutes
-# 意図: サーバー起動(Boot)してから、最初の1回目を実行するまでの待機時間。
-# 起動直後の高負荷を防ぐために設定。
-OnBootSec=10min
-# 意図: 前回の実行(Active)から、次の実行までの間隔。
-# これで「10分おき」のループを作ります。
+# サーバー起動(Boot)してから、最初の1回目を実行するまでの待機時間。
+OnBootSec=1min
+# 前回の実行(Active)から、次の実行までの間隔。
 OnUnitActiveSec=10min
-# 時間が来たら、さっき作った「monitoring.service」を呼び出すという指定。
+# 時間が来たら、monitoring.serviceを呼び出すという指定。
 Unit=monitoring.service
-# PC起動時にタイマーを自動有効化するための決まり文句
+# PC起動時にタイマーを自動有効化するための決まり文句。
 WantedBy=timers.target
+```
+設定後は、デーモンに設定ファイルを読ませて、再起動
+```sh
+sudo systemctl daemon-reload
+sudo systemctl restart monitoring.timer
 ```
 
 
