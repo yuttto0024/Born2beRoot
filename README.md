@@ -113,52 +113,85 @@ Debianのパッケージ管理システムにおいて、aptは標準的なイ�
 
 # Instruction
 以下、本プロジェクトの実装手順をまとめる。
-## Phase1. 
-### 仮想マシンのsetup
-- debian13-2-0-amd64をインストール
-- VBは入ってた。
-- VBで仮想ドライブ（ディスクのフリをするファイル）作成
-  - BaseMemory:2048MB..2GB割当
-  - CPUは2つ
-  - EFIは無効、レガシーBIOSで行く。（仮想マシン上で別々のosは切り替えないため、設定の量も多いため、当課題には適していない）
-  - ストレージは30.0GB、pre-allocateはしない。逐次マッピングで軽量化。
-- ISO連携（仮想ドライブにosを入れる）
-  - Controler:IDEってのにDLしたDebianのパスを指定。
-- 仮想マシン起動
-  - 言語、root、ゲストユーザー初期化
-  - パーティション設定（ボーナスゆえ手動）
-    - sda1はprimalyで作成（primaryは4つまで）
-    - 論理ボリュームとか、ファイルサイズを分担（ココ言語化未完成）
-  - package managerのインストール
-  - GRUBのインストールが終了
-ここまでで、「ホストマシンのCPUとRAM（計算資源）を借りて、USBメモリ上のファイルを「仮想的なハードディスク」と認識させ、そこでDebian OSを動かしている状態」
-以下、図式。
-1. CPU/メモリ：iMac
-2. ハードディスク：USBメモリ
-3. OS: USBの中の.vbiファイルの中にDebian
+## Phase1 
 
-## Phase2. 
+### 1. 仮想ドライブのセットアップ
+物理マシンの中に、ソフトウェアで再現した仮想のハードウェアを作成する工程。
+- **OS: Debian**
+  debian13-2-0-amd6を使用。CentOSと比較してパッケージ管理が容易で、初心者向けのドキュメントが豊富なため。
+- **Firmware: Legacy BIOS**  
+本課題のパーティション構成（MBR方式）に合わせるため。EFIを有効にするとパーティション設計が複雑化するため、学習目的ではレガシーBIOSの方が構造を理解しやすい。
+- **Storage (Virtual Disk)**
+  - File Type: .vdi
+  - Size: 15.0 GB
+  - Allocation: Dynamically allocated (可変サイズ / 逐次マッピング)  
+  「15GBの箱」を先に確保するのではなく、データが増えた分だけホストの容量を使う設定。ホストのストレージ圧迫を防ぐため。
+
+### 2. osインストール
+仮想マシンを起動し、仮想ディスクにDebianをインストールする工程。
+- **ISO Mount**  
+  ダウンロードしたDebianの .iso ファイルを、仮想マシンの仮想ドライブにセットして起動。
+- **Partitioning (Manual)**  
+  LVMと暗号化を手動で構築した。
+- **Primary Partition (sda1)**  
+  - **Mount: /boot**  
+    起動用プログラム（Kernel）を置く場所。ここは暗号化してはいけない（鍵を開けるプログラム自体が読めなくなるため）。
+  - **Logical Partition (sda5)**  
+    - Type: Encrypted Volume (LUKS)
+    - 残りの全領域。ここを暗号化し、その中にLVM（論理ボリューム）を作成する。OS本体（root, home, swap）は全てこの中に格納される。
+- **Boot Loader**  
+  GRUBをメインドライブ（/dev/sda）にインストール。
+- **詳細**
+  - **計算資源（CPU/RAM）**  
+    物理マシンの一部を、VirtualBoxが借りて、仮想マシンに分け与えている。
+  - **ハードディスク**  
+    .vdi という巨大ファイルを、仮想マシンが「本物のハードディスク」と認識。Debianがこのファイルの中身に書き込みを行う。
+  - **os**
+    仮想ハードの上で、Debianが動いている。
+
+## Phase2 
 ### ユーザー、グループ周り
-- sudoインストール（apt install sudo）（デバッグ：which sudo, sudo -V）
-- ユーザー作成（sudo adduser ~~, デバッグ：/grep/passwd）
+- sudoインストール:```apt install sudo```、デバッグ:```sudo --version```
+- ユーザー作成：```sudo adduser <username>```、デバッグ：```getent passwd <username>```
 - グループ作成（sudo addgroup ~~, デバッグ：getent group <groupname>）
 - グループに追加（sudo adduser <username> <groupname>）
 ### sshインストールと設定
 - apt install sshで入れた（デバッグ：systemctl status ssh）
 - /etc/ssh/sshd_config のPort番号変更、SSH経由のrootログイン禁止（デバッグ：sysctl + restart）
 - 外部からポート番号 + ユーザーログイン（ssh yuonishi@localhost -p 4242）
+
 ### ufwインストールと設定
 - インストール + 有効化
-- ファイアウォールによるポート番号の接続許可（sudo ufw allow 4242）（デバッグ：sudo lsof -i -P）
+- ファイアウォールによるポート番号の接続許可：```ufw allow 4242```
+- ufwデバッグ
+  - ufwが存在するか：```ufw --version``` ```which ufw```
+  - ufw サービスが有効か：```ufw status verbose```
+  - ルール確認：```ufw numbered```
+  - 通信しているか：```lsof -i -P```
+- systemctl と ufw は思想が違う
+  - systemctl
+    - 「プログラムは動いているか」状態確認
+    - デーモン管理
+  - ufw
+    - 「通信を通すか」ルール管理
+
+### 典型的なデバッグフロー
+1. sshdは動いてるか：``` systemctl status ssh ```
+2. ポートは開いてるか：``` lsof/ ss ```
+3. firewall 通してるか：``` ufw status ```
+
 ## sudoポリシー
+ココでは、メインの設定ファイル（/etc/sudoers）を直接編集せず、/etc/sudoers.d/ ディレクトリ内に専用のファイルを作成して管理している。
+### ファイル構造
+- Config file：```/etc/sudoers.d/sudo_config```
+- Config file：```/var/log/sudo/```
 - sudoers.dというsudoサービスの常駐プロセスの設定用のファイルを作成（touch /etc/sudoers.d/sudo_config）
 - mkdir /var/log/sudo（varに記録残して、sudoは、管理者権限を実行かつ、実行下ユーザーのログを残すシステム）
 - sudoの設定（sudo visudo -f /etc/sudoers.d/sudo_config）
 sudoの設定、特にrootユーザーのパスワードが無効化した状態でsudoが壊れると、管理者権限になれなくなり修正不能。
 visudoは、保存前に文法チェックが走る。
 sudo visudoを打つと自動でメインの設定ファイル（/etc/sudoers）を開くため、-fフラグ
-```
-root@yuonishi42:/etc#cat /etc/sudoers.d/sudo_config
+```sh
 Defaults	passwd_tries=3
 Defaults	badpass_message="Wrong Password!!"
 Defaults	logfile="/var/log/sudo/sudo_config"
@@ -167,7 +200,27 @@ Defaults	iolog_dir="/var/log/sudo"
 Defaults	requiretty
 Defaults	secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
 ```
-適当なsudoでデバッグ。
+### visudo
+設定ファイルの編集には必ず visudo コマンドを使用する。
+- **文法チェック機能**  
+  visudo は保存時に自動で構文チェックを行う。もし設定に記述ミスがある場合、保存をブロックして警告を出す。
+- **ロックアウト防止**  
+  sudo の設定が壊れると、管理者権限（root）になれなくなり、システムの修正が不可能になる。visudo はこの事故を防ぐための安全装置である。
+- **使用コマンド**  
+  標準では /etc/sudoers を開くため、-f フラグでファイルを指定する。
+  ```sh
+  sudo EDITOR=vim visudo -f /etc/sudoers.d/sudo_config
+  ```
+- **デバッグ：**  
+  - **設定ルールの確認：**```sudo -l -U <username>```
+    現在ログインしているユーザーに適用されているSudoのルールと、実行可能な権限一覧を表示する。設定ファイルを開かずに、有効な設定を表示できる。
+  - **ログの確認**  
+    コマンドの実行履歴（Input/Output）が正しく保存されているか確認する。
+    ```sh
+    sudo ls /var/log/sudo/
+    sudo cat /var/log/sudo/sudo.log
+    ```
+
 ### パスワードポリシー
 - パスワードの有効期限編集
 - パスワードモジュールPAMのインストール（デバッグ：passwdでパスワード変更）
