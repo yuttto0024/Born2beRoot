@@ -256,9 +256,9 @@ enforce_for_root #このルールをRootユーザーにも強制する
 ```
 - デバッグ：```passwd```
 ## Phase3
-### System Monitoring Script (monitoring.sh)
+### monitoring.sh：/usr/local/bin/monitoring.sh
 ここでは、以下のシステム情報を収集し、全端末に通知するBashスクリプトを作成。   
-アドレス：```/var/log/sudo/sudo_config```
+アドレス：```/usr/local/bin/monitoring.sh```
 1. Architecture  
   ```uname -a```（Unix Name）コマンドを使用し、os名、カーネルバージョン、ハードウェアアーキテクチャ等のシステムの基本情報を網羅的に表示。
 2. CPU Physical  
@@ -282,7 +282,7 @@ enforce_for_root #このルールをRootユーザーにも強制する
 11. Network  
   ```hostname -I``` コマンドでIPアドレスを取得し、```ip link``` コマンドから ```grep``` と ```awk``` を用いてMACアドレス（Ethernetアドレス）を抽出。これらを組み合わせて表示しています。
 12. Sudo  
-  Sudoのログファイル（/var/log/sudo/sudo_config）内に記録された "COMMAND" という文字列を含む行を ```grep``` で検索し、その行数を ```wc -l``` でカウントすることで、Sudoコマンドの実行総数を算出。
+  Sudoのログファイル（/var/log/sudo/sudo.log）内に記録された "COMMAND" という文字列を含む行を ```grep``` で検索し、その行数を ```wc -l``` でカウントすることで、Sudoコマンドの実行総数を算出。
 13. wall  
   ```echo ""```メッセージを```wall```に渡す。```wall```は、ログインしている全員の画面にブロードキャストする。
 ## Phase4
@@ -337,6 +337,25 @@ sudo systemctl daemon-reload
 sudo systemctl restart monitoring.timer
 ```
 
+### Systemd Timer の停止
+1. ログのリアルタイム監視：```sudo journalctl -u monitoring.service -f```
+2. タイマーの停止：```sudo systemctl stop monitoring.timer```
+3. 実行間隔の変更：```sudo vim /etc/systemd/system/monitoring.timer```
+4. 設定反映
+```sh
+sudo systemctl daemon-reload
+sudo systemctl restart monitoring.timer
+```
+5. ログで~分毎に動くか確認。
+
+### hostnameの変更
+- /etc/hostname：表札。ターミナルの@の後ろが変わる。
+- /etc/hosts：システムによる、アドレスと名前の対応表
+1. デバッグ：```hostnamectl```
+2. 表札を書き換える：```sudo hostnamectl set-hostname new_host```
+3. 住所録を書き換える：```sudo vim /etc/hosts```
+4. 再起動して反映```sudo reboot```
+5. デバッグ
 
 ## Phase4
 # Resoureces
