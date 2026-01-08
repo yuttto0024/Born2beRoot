@@ -363,7 +363,86 @@ sudo systemctl restart monitoring.timer
 4. 再起動して反映```sudo reboot```
 5. デバッグ
 
-## Phase4
+## Bonus Part
+
+## 1. Web Server Implementation  
+### Step1.内部（Debian）からLighttpdへのアクセス  
+- apt install lighttpd
+  - デーモン確認：systemctl status lighttpd
+- ufw allow 80
+  - ポートの待ち受け確認：ss -tulpn | grep lighttpd
+- ufw status
+- curl http://localhost
+
+### Step 2. 外部（Host OS）からWebサーバーへのアクセス  
+Webサーバーが正常に稼働していても、ネットワーク設定が不十分だと外部から閲覧できない。  　
+VirtualBoxのポートフォワーディング機能を使用して、ホストマシンと仮想マシン間の通信経路を確立する。
+
+1. **VirtualBox Port Forwarding**  
+   ホストマシンのポート 8080 へのアクセスを、ゲストマシンのWebサーバーポート 80 へ転送する設定を追加。
+   - **Protocol:** TCP  
+   - **Host Port:** 8080  
+   - **Guest Port:** 80  
+
+2. **Access from Host Browser**  
+   ホストOS（Windows/Mac）のブラウザから以下のURLへアクセスし、Lighttpdのデフォルトページが表示されることを確認。
+   - **URL:** `http://localhost:8080`  
+   - **Validation:** "Placeholder page" が表示されれば、Webサーバーの公開設定は完了。  
+
+---
+
+## 2. Database Implementation (MariaDB)
+WordPressのデータを管理・保存するために、RDBMS（リレーショナルデータベース管理システム）である **MariaDB** を採用した。
+
+### MariaDB
+- **目的** WordPressの投稿データ、設定情報、ユーザー認証情報などを永続的に保存する。Webサーバー（Lighttpd）からのリクエストに応じ、必要なデータを検索・提供するバックエンドの役割を担う。
+- **セキュリティ設定** インストール直後のデフォルト設定はセキュリティが低いため、専用スクリプトを用いて堅牢化を行った。最新のDebian環境に合わせ、コマンドは `mariadb-secure-installation` を使用。
+  - **匿名ユーザーの削除**: 誰でもログインできる不要なアカウントを削除。
+  - **リモートRootログインの禁止**: 管理者権限（Root）でのログインをローカル（localhost）のみに制限し、外部からの攻撃を防ぐ。
+
+### Implementation Steps
+1. **Installation**
+   ```bash
+   sudo apt install mariadb-server -y
+
+
+  ---
+
+  ### Database Configuration (SQL)
+WordPress用のデータベースと専有ユーザーを作成し、権限を付与した。
+
+1. **Create Database & User**
+   MariaDBコンソールにログインし、以下のSQLコマンドを実行。
+   ```sql
+   /* 1. Database作成 */
+   CREATE DATABASE wordpress_db;
+   
+   /* 2. User作成 (パスワードは適切に設定) */
+   CREATE USER 'wp_user'@'localhost' IDENTIFIED BY 'password123';
+   
+   /* 3. 権限付与 (WordPressDBへの全権限をwp_userに与える) */
+   GRANT ALL PRIVILEGES ON wordpress_db.* TO 'wp_user'@'localhost';
+   
+   /* 4. 設定反映 */
+   FLUSH PRIVILEGES;
+
+## 3. PHP Implementation (Processor)
+WordPressはPHP言語で記述された動的なCMSであるため、WebサーバーがPHPコードを解釈・実行できる環境を構築した。
+
+### PHP Components
+- **php-cgi**
+  - **目的:** Lighttpd上でPHPを実行するためのFastCGI対応インタプリタ。Webサーバーからのリクエストを受け取り、PHPスクリプトを処理してHTMLを生成する。
+- **php-mysql**
+  - **目的:** PHPアプリケーション（WordPress）がバックエンドのデータベース（MariaDB）と通信するためのドライバモジュール。
+
+### Implementation Steps
+1. **Installation**
+   必要なパッケージを一括インストール。
+   ```bash
+   sudo apt install php-cgi php-mysql -y
+
+---
+
 # Resources
 [Markdown記法 チートシート - Qiita](https://qiita.com/Qiita/items/c686397e4a0f4f11683d)
 [Linuxのディストリビューション比較](https://eng-entrance.com/linux-distribution-compare)
