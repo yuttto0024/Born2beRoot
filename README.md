@@ -68,17 +68,6 @@ Debianのパッケージ管理システムにおいて、aptは標準的なイ�
     sudo aptitude
     ```
 
-### DAC（任意アクセス制御）とMAC（強制アクセス制御）
-これらの違いは、「誰がルールを決めるか」と「何を防ぎたいか」
-1. DAC（Discretionary Access Control）
-- 目的：ユーザーごとのプライバシーを守る。
-- 仕組み：ファイルの所有者が、「誰に見せていいか」を自分で決める。
-- 弱点：なりすましに弱い。もしウイルスが自分の権限で実行されたら、そのウイルスはあなたがアクセスできる全てのファイルを盗めてしまう。システムは「自分のやっている」と判断して止めてくれない。
-2. MAC（Mandatory Access Control）
-- 目的：被害を最小限に抑える
-- 仕組み：管理者一人が、アクセス制御を行う。サブジェクトがオブジェクトに対してアクセスできる範囲を制限できる。
-- 強み：プログラム毎に制限できるため、Webサーバーが乗っ取られてもMACによって、/homeやパスワードファイルを守れる。
-
 ### AppArmor とは
 - **概要**  
   Linuxカーネルのセキュリティモジュール（LSM）の一種で、MACを実装するシステム。
@@ -86,6 +75,23 @@ Debianのパッケージ管理システムにおいて、aptは標準的なイ�
   プログラム（WebサーバーやDBなど）に脆弱性があり、万が一乗っ取られたとしても、そのプログラムが本来アクセスする必要のないファイルへのアクセスを遮断する。具体的には、特定のシステムコールを監視し、アクセス許可がないとブロックしてエラーを返す。
 - **プロファイルとは**  
   アプリごとの「許可リスト」。「このアプリは、このフォルダは読み込んでいいが、書き込みは不許可」「ネット接続は許可」といった細かいルールが書かれた設定ファイルのこと。
+
+### DAC（任意アクセス制御）とMAC（強制アクセス制御）
+これらの違いは、「誰がルールを決めるか」と「何を防ぎたいか」
+1. DAC（Discretionary Access Control）
+- **目的**  
+  ユーザーごとのプライバシーを守る。
+- **仕組み**  
+  ファイルの所有者が、「誰に見せていいか」を自分で決める。
+- **弱点**
+  なりすましに弱い。もしウイルスが自分の権限で実行されたら、そのウイルスはあなたがアクセスできる全てのファイルを盗めてしまう。システムは「自分のやっている」と判断して止めてくれない。
+2. MAC（Mandatory Access Control）
+- **目的**
+  被害を最小限に抑える
+- **仕組み**  
+  管理者一人が、アクセス制御を行う。サブジェクトがオブジェクトに対してアクセスできる範囲を制限できる。
+- **強み**  
+  プログラム毎に制限できるため、Webサーバーが乗っ取られてもMACによって、/homeやパスワードファイルを守れる。
 
 ### UFW とは
 - **概要**  
@@ -318,23 +324,17 @@ Systemdの設定ファイルは「INIファイル形式」という古いルー�
 ### monitoring.service  
 アドレス：/etc/systemd/system/monitoring.service
 ```sh
-Description=Monitoring Script Service
-#実行するスクリプトの絶対パス。
-ExecStart=/usr/local/bin/monitoring.sh
-# 常駐せず、スクリプトが終わったらプロセスも終了させる。これがないと「実行中」の状態が続き、タイマーが次を呼べなくなる。
+Description=Monitoring Script Service #実行するスクリプトの絶対パス。
+ExecStart=/usr/local/bin/monitoring.sh  #常駐せず、スクリプトが終わったらプロセスも終了させる。これがないと「実行中」の状態が続き、タイマーが次を呼べなくなる。
 Type=oneshot
 ```
 ### monitoring.timer
 アドレス：/etc/systemd/system/monitoring.timer
 ```sh
-Description=Run monitoring script every 10 minutes
-# サーバー起動(Boot)してから、最初の1回目を実行するまでの待機時間。
-OnBootSec=1min
-# 前回の実行(Active)から、次の実行までの間隔。
-OnUnitActiveSec=10min
-# 時間が来たら、monitoring.serviceを呼び出すという指定。
-Unit=monitoring.service
-# PC起動時にタイマーを自動有効化するための決まり文句。
+Description=Run monitoring script every 10 minutes  #サーバー起動(Boot)してから、最初の1回目を実行するまでの待機時間。
+OnBootSec=1min  #前回の実行(Active)から、次の実行までの間隔。
+OnUnitActiveSec=10min #時間が来たら、monitoring.serviceを呼び出すという指定。
+Unit=monitoring.service #PC起動時にタイマーを自動有効化するための決まり文句。
 WantedBy=timers.target
 ```
 設定後は、デーモンに設定ファイルを読ませて、再起動
@@ -364,7 +364,7 @@ sudo systemctl restart monitoring.timer
 5. デバッグ
 
 ## Phase4
-# Resoureces
+# Resources
 [Markdown記法 チートシート - Qiita](https://qiita.com/Qiita/items/c686397e4a0f4f11683d)
 [Linuxのディストリビューション比較](https://eng-entrance.com/linux-distribution-compare)
 [DACとMAC、RBACの違い](https://qiita.com/miyuki_samitani/items/acde77784237e482aef8)
