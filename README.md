@@ -13,38 +13,29 @@ _This project has been created as part of the 42 curriculum by yuonishi._
 仮想化ソフトウェアの VirtualBox を使用して、物理マシン上に仮想マシンを構築し、その上でサーバーを構築した。また、「最小限のサービスのみをインストールする」というレギュレーションの下、以下のサービスとセキュリティ設定を実装した。
 * **Operating System:**&nbsp;&nbsp;Debian
 * **Partitioning:**&nbsp;&nbsp;LVM
-* **Security:**&nbsp;&nbsp;SSH, Pasward Policy
+* **Security:**&nbsp;&nbsp;SSH, Passward Policy
 * **Firewall:**&nbsp;&nbsp;UFW
 * **Scheduling:**&nbsp;&nbsp;Systemd timer
 
 # Project Description
-本プロジェクトにおいて、osに **Debian** を選択した。  
+本プロジェクトにおいて、osに **Debian** を選択した。
 以下、他OSと比較を説明する。
 ## Operating System
-
+利用目的やスキルレベルに応じて、適切なディストリビューションを選ぶ。例えば、初心者にはUbuntu、サーバー用途にはCentOSやDebianなどがある。
 ### Debian
 - **目的**  
-  安定性を最優先に設計されたOS。「とにかく壊れない」ことを重視。
-- **開発**  
-  特定の企業に依存しない、完全なコミュニティ主導開発。フリーソフトウェアを重視。
+  本課題においては、複雑な商用仕様（RHEL系）よりも、ドキュメントが豊富でセキュリティ設定（AppArmor）やパッケージ管理（APT）の挙動が理解しやすいDebianを採用することで、Linuxシステム管理の基礎を学習しやすい。
 - **特徴**  
-  - **安定思想**  
-    パッケージのバージョンはあえて古く保たれており、バグが少なく非常に安定している。長期稼働サーバー（Web, DB）に最適。
-  - **学習面**  
-    初心者に優しく、ネット上に情報が多いためトラブルシューティングしやすい。また、Linuxの下の構造を理解しやすい。
+  - 特定の親企業（Red Hatなど）を持たず、世界中のボランティア開発者によって運営されている。商業的な理由による仕様変更やサポート終了がない。
+  - パッケージ管理において、Rocky Linuxの dnf と比較して、構文がシンプルで、システム構築の学習に最適。
+  - Rocky Linux における SELinux は設定が複雑だが、Debianの AppArmor はファイルパスベースで設定できるため、手軽に設定できる。
 
 ### CentOS
 - **目的**  
-  企業向け商用Linuxである RHEL (Red Hat Enterprise Linux) の無料クローン版。
-  RHEL (Red Hat Enterprise Linux) と互換性があり、企業採用率が高い。
-- **開発**  
-  企業（Red Hat社）の開発ライン上にある。
+  基本的に商用で無料で使いたければ最適なos。
 - **特徴**  
-  企業の開発環境に採用率が高い。また、RHELと互換性があり、商用環境の事前検証や、Red Hat系スキルの習得に向いている。
-
-### Rocky
-- CentOSの正統後継OS。
-- 以前のCentOSと同じく、RHELと互換性がある。
+  企業向け商用Linuxで、高価なRHEL (Red Hat Enterprise Linux) の無料クローン版。
+  クローンなため特徴はほぼ変わらないが、RHELを追従する形なので、セキュリティフィックス（ソフトウェアもセキュリティ上の脆弱性を修正する更新プログラム（セキュリティパッチ））が若干遅れるラグ存在する。
 
 ## Comparison of Tools
 本プロジェクトの設計おいて、**VirtualBox**、**AppArmor**、**UFW**を選択した。
@@ -76,11 +67,23 @@ Debianのパッケージ管理システムにおいて、aptは標準的なイ�
     # ビジュアルモードの起動
     sudo aptitude
     ```
+
+### DAC（任意アクセス制御）とMAC（強制アクセス制御）
+これらの違いは、「誰がルールを決めるか」と「何を防ぎたいか」
+1. DAC（Discretionary Access Control）
+- 目的：ユーザーごとのプライバシーを守る。
+- 仕組み：ファイルの所有者が、「誰に見せていいか」を自分で決める。
+- 弱点：なりすましに弱い。もしウイルスが自分の権限で実行されたら、そのウイルスはあなたがアクセスできる全てのファイルを盗めてしまう。システムは「自分のやっている」と判断して止めてくれない。
+2. MAC（Mandatory Access Control）
+- 目的：被害を最小限に抑える
+- 仕組み：管理者一人が、アクセス制御を行う。サブジェクトがオブジェクトに対してアクセスできる範囲を制限できる。
+- 強み：プログラム毎に制限できるため、Webサーバーが乗っ取られてもMACによって、/homeやパスワードファイルを守れる。
+
 ### AppArmor とは
 - **概要**  
-  「誰が実行しているか」に関わらず、「そのアプリが何をしていいか」を強制的に制限するセキュリティシステム。
+  Linuxカーネルのセキュリティモジュール（LSM）の一種で、MACを実装するシステム。
 - **役割**  
-  もしWebサーバーなどのアプリがハッカーに乗っ取られても、アプリ自体に**「Web用の画像フォルダ以外は触るな」**という制限（プロファイル）をかけておくことで、パスワードファイルなどを盗まれるのを防ぐ。
+  プログラム（WebサーバーやDBなど）に脆弱性があり、万が一乗っ取られたとしても、そのプログラムが本来アクセスする必要のないファイルへのアクセスを遮断する。具体的には、特定のシステムコールを監視し、アクセス許可がないとブロックしてエラーを返す。
 - **プロファイルとは**  
   アプリごとの「許可リスト」。「このアプリは、このフォルダは読み込んでいいが、書き込みは不許可」「ネット接続は許可」といった細かいルールが書かれた設定ファイルのこと。
 
@@ -98,18 +101,7 @@ Debianのパッケージ管理システムにおいて、aptは標準的なイ�
 パーティションを可動式に変える技術。
 - メモリ管理が「仮想アドレス」と「物理アドレス」をページテーブルで管理するように、 LVMは「論理エクステント (LE)」と「物理エクステント (PE)」をマッピングテーブルで管理している。  
 - OS（ファイルシステム）は「連続したディスク領域」と思って書き込むが、LVMが裏で物理ディスク上の最適な場所にデータを分散させている（Device Mapper機能）。
-### パーティション構造
-- **sda1 (/boot)**
-  - **Unencrypted**
-  - **理由**  
-    PC起動時、BIOS/UEFIが最初に読み込む場所。ここには「暗号化解除画面を出すためのプログラム（Bootloader）」が入っているため、暗号化してはいけない（暗号化すると起動不能になる）。
-- **sda2 (Extended)**  
-  - MBRの制限（プライマリは4つまで）のため作成された、論理パーティションを入れるためのコンテナ。
-- sda5  
-  - **Encrypted**  
-  - **理由** 
-    - ここにOSの本体（/root, /home, /var, swap）が全て格納されている。
-    - 物理ディスク上では乱数に見えるため、PC盗難時等の情報漏洩を防ぐ。
+
 
 # Instruction
 以下、本プロジェクトの実装手順をまとめる。
@@ -148,6 +140,19 @@ Debianのパッケージ管理システムにおいて、aptは標準的なイ�
     .vdi という巨大ファイルを、仮想マシンが「本物のハードディスク」と認識。Debianがこのファイルの中身に書き込みを行う。
   - **os**
     仮想ハードの上で、Debianが動いている。
+
+### パーティション構造
+- **sda1 (/boot)**
+  - **Unencrypted**
+  - **理由**  
+    PC起動時、BIOS/UEFIが最初に読み込む場所。ここには「暗号化解除画面を出すためのプログラム（Bootloader）」が入っているため、暗号化してはいけない（暗号化すると起動不能になる）。
+- **sda2 (Extended)**  
+  - MBRの制限（プライマリは4つまで）のため作成された、論理パーティションを入れるためのコンテナ。
+- sda5  
+  - **Encrypted**  
+  - **理由** 
+    - ここにOSの本体（/root, /home, /var, swap）が全て格納されている。
+    - 物理ディスク上では乱数に見えるため、PC盗難時等の情報漏洩を防ぐ。
 
 ## Phase2 
 ### ユーザー、グループ周り
@@ -204,11 +209,12 @@ Debianのパッケージ管理システムにおいて、aptは標準的なイ�
   - sudoers.dというsudoサービスの常駐プロセスの設定用のファイルを作成（touch /etc/sudoers.d/sudo_config）
   - mkdir /var/log/sudo（varに記録残して、sudoは、管理者権限を実行かつ、実行下ユーザーのログを残すシステム）
   - sudoの設定（sudo visudo -f /etc/sudoers.d/sudo_config）
-    sudoの設定、特にrootユーザーのパスワードが無効化した状態でsudoが壊れると、管理者権限になれなくなり修正不能。visudoは、保存前に文法チェックが走る。sudo visudoを打つと自動でメインの設定ファイル（/etc/sudoers）を開くため、-fフラグをつける。
+    - sudoの設定、特にrootユーザーのパスワードが無効化した状態でsudoが壊れると、管理者権限になれなくなり修正不能。  
+    - visudoは、保存前に文法チェックが走る。sudo visudoは自動で（/etc/sudoers）を開くため、-fフラグをつける。
 ```sh
 Defaults	passwd_tries=3
 Defaults	badpass_message="Wrong Password!!"
-Defaults	logfile="/var/log/sudo/sudo_config"
+Defaults	logfile="/var/log/sudo/sudo.log"  #sudoの入力履歴のみを記録する
 Defaults	log_input, log_output
 Defaults	iolog_dir="/var/log/sudo"
 Defaults	requiretty
@@ -360,3 +366,5 @@ sudo systemctl restart monitoring.timer
 ## Phase4
 # Resoureces
 [Markdown記法 チートシート - Qiita](https://qiita.com/Qiita/items/c686397e4a0f4f11683d)
+[Linuxのディストリビューション比較](https://eng-entrance.com/linux-distribution-compare)
+[DACとMAC、RBACの違い](https://qiita.com/miyuki_samitani/items/acde77784237e482aef8)
