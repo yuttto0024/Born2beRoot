@@ -1,46 +1,60 @@
 _This project has been created as part of the 42 curriculum by yuonishi._
 
+&nbsp;  
+
 ## 目次
 
 1. [Description](#description)
 2. [Project Description](#project-description)
 3. [Instruction](#instruction)
-4. [Bonus](#bonus)
+4. [Bonus1](#bonus1)  
+5. [Bonus2](#bonus2)
 5. [Resources](#resources)
+
+&nbsp;  
+&nbsp;  
+&nbsp;  
 
 # Description
 本プロジェクトは、システム管理および仮想化機能の基礎を実践的に学ぶ課題である。  
 仮想化ソフトウェアの VirtualBox を使用して、物理マシン上に仮想マシンを構築し、その上でサーバーを構築した。また、「最小限のサービスのみをインストールする」というレギュレーションの下、以下のサービスとセキュリティ設定を実装した。
 * **Operating System:**&nbsp;&nbsp;Debian
 * **Partitioning:**&nbsp;&nbsp;LVM
-* **Security:**&nbsp;&nbsp;SSH, Passward Policy
+* **Security:**&nbsp;&nbsp;SSH, Passward Policy, Fail2ban
 * **Firewall:**&nbsp;&nbsp;UFW
 * **Scheduling:**&nbsp;&nbsp;Systemd timer
+
+&nbsp;  
+&nbsp;  
 
 # Project Description
 本プロジェクトにおいて、osに **Debian** を選択した。
 以下、他OSと比較を説明する。
+
+&nbsp;  
+
 ## Operating System
-利用目的やスキルレベルに応じて、適切なディストリビューションを選ぶ。例えば、初心者にはUbuntu、サーバー用途にはCentOSやDebianなどがある。
+利用目的やスキルレベルに応じて、適切なディストリビューションを選ぶ。
 ### Debian
 - **目的**  
-  本課題においては、複雑な商用仕様（RHEL系）よりも、ドキュメントが豊富でセキュリティ設定（AppArmor）やパッケージ管理（APT）の挙動が理解しやすいDebianを採用することで、Linuxシステム管理の基礎を学習しやすい。
+  本課題においては、複雑な商用仕様（RHEL系）よりも、ドキュメントが豊富でセキュリティ設定（AppArmor）の挙動が理解しやすいDebianを採用する。
 - **特徴**  
   - 特定の親企業（Red Hatなど）を持たず、世界中のボランティア開発者によって運営されている。商業的な理由による仕様変更やサポート終了がない。
-  - パッケージ管理において、Rocky Linuxの dnf と比較して、構文がシンプルで、システム構築の学習に最適。
-  - Rocky Linux における SELinux は設定が複雑だが、Debianの AppArmor はファイルパスベースで設定できるため、手軽に設定できる。
+  - Rocky Linux における SELinux は設定が複雑だが、Debianの AppArmor はファイルパスで管理できる。
 
 ### CentOS
 - **目的**  
   基本的に商用で無料で使いたければ最適なos。
 - **特徴**  
   企業向け商用Linuxで、高価なRHEL (Red Hat Enterprise Linux) の無料クローン版。
-  クローンなため特徴はほぼ変わらないが、RHELを追従する形なので、セキュリティフィックス（ソフトウェアもセキュリティ上の脆弱性を修正する更新プログラム（セキュリティパッチ））が若干遅れるラグ存在する。
+  クローンなため特徴はほぼ変わらないが、RHELを追従する形なので、セキュリティフィックス（ソフトウェアもセキュリティ上の脆弱性を修正する更新プログラム（セキュリティパッチ））が若干遅れるラグが存在する。
+
+&nbsp;  
 
 ## Comparison of Tools
 本プロジェクトの設計おいて、**VirtualBox**、**AppArmor**、**UFW**を選択した。
 ### Apt vs Aptitude
-どちらもDebian系のパッケージ管理ツールだが、役割と機能に明確な違いがある。
+どちらもDebian系のパッケージ管理ツールだが、役割と機能に明確な違いがある。  
 Debianのパッケージ管理システムにおいて、aptは標準的なインターフェースであり、aptitudeはより高度な機能を持つフロントエンドである。
 * **Apt（Advanced Packaging Tool）**  
   - **特徴**  
@@ -77,19 +91,21 @@ Debianのパッケージ管理システムにおいて、aptは標準的なイ�
   アプリごとの「許可リスト」。「このアプリは、このフォルダは読み込んでいいが、書き込みは不許可」「ネット接続は許可」といった細かいルールが書かれた設定ファイルのこと。
 
 ### DAC（任意アクセス制御）とMAC（強制アクセス制御）
-これらの違いは、「誰がルールを決めるか」と「何を防ぎたいか」
+これらの違いは、「誰がルールを決めるか」と「何を防ぎたいか」である。
 1. DAC（Discretionary Access Control）
 - **目的**  
   ユーザーごとのプライバシーを守る。
 - **仕組み**  
   ファイルの所有者が、「誰に見せていいか」を自分で決める。
-- **弱点**
-  なりすましに弱い。もしウイルスが自分の権限で実行されたら、そのウイルスはあなたがアクセスできる全てのファイルを盗めてしまう。システムは「自分のやっている」と判断して止めてくれない。
+- **弱点**  
+  なりすましに弱い。もしウイルスが自分の権限で実行されたら、自分がアクセスできる全てのファイルを盗めてしまう。システムは「自分のやっている」と判断して止めてくれない。
 2. MAC（Mandatory Access Control）
-- **目的**
+- **目的**  
   被害を最小限に抑える
 - **仕組み**  
   管理者一人が、アクセス制御を行う。サブジェクトがオブジェクトに対してアクセスできる範囲を制限できる。
+  - サブジェクトは動作する側（プロセスやユーザー）
+  - オブジェクトは操作される側（ファイル、ディレクトリ、ポート等のリソース）
 - **強み**  
   プログラム毎に制限できるため、Webサーバーが乗っ取られてもMACによって、/homeやパスワードファイルを守れる。
 
@@ -108,17 +124,23 @@ Debianのパッケージ管理システムにおいて、aptは標準的なイ�
 - メモリ管理が「仮想アドレス」と「物理アドレス」をページテーブルで管理するように、 LVMは「論理エクステント (LE)」と「物理エクステント (PE)」をマッピングテーブルで管理している。  
 - OS（ファイルシステム）は「連続したディスク領域」と思って書き込むが、LVMが裏で物理ディスク上の最適な場所にデータを分散させている（Device Mapper機能）。
 
+&nbsp;  
+&nbsp;  
+&nbsp;  
 
 # Instruction
 以下、本プロジェクトの実装手順をまとめる。
+
+&nbsp;  
+
 ## Phase1 
 
 ### 1. 仮想ドライブのセットアップ
 物理マシンの中に、ソフトウェアで再現した仮想のハードウェアを作成する工程。
 - **OS: Debian**  
-  debian13-2-0-amd6を使用。CentOSと比較してパッケージ管理が容易で、初心者向けのドキュメントが豊富なため。
+  debian13-2-0-amd6を使用。Rocky Linux (RHEL系) と比較して、ドキュメントの豊富さがあり、トラブルシューティングが容易で学習に適しているため。
 - **Firmware: Legacy BIOS**  
-本課題のパーティション構成（MBR方式）に合わせるため。EFIを有効にするとパーティション設計が複雑化するため、学習目的ではレガシーBIOSの方が構造を理解しやすい。
+本課題のパーティション構成に合わせるため。EFIを有効にするとパーティション設計が複雑化するため、学習目的では、余計なパーティションが不要なLegacy BIOSの方が構造を理解しやすい。
 - **Storage (Virtual Disk)**
   - File Type: .vdi
   - Size: 15.0 GB
@@ -137,8 +159,12 @@ Debianのパッケージ管理システムにおいて、aptは標準的なイ�
   - **Logical Partition (sda5)**  
     - Type: Encrypted Volume (LUKS)
     - 残りの全領域。ここを暗号化し、その中にLVM（論理ボリューム）を作成する。OS本体（root, home, swap）は全てこの中に格納される。
-- **Boot Loader**  
+- **ブートローダー**  
   GRUBをメインドライブ（/dev/sda）にインストール。
+  - GRUBとは  
+    PC起動時に、ハードウェア（BIOS）からバトンを受け取り、OS（Debian）を呼び出すための「案内役プログラム」。
+  - 場所の理由  
+    BIOSは起動時、ディスクの一番先頭しか見に行かないルールがある。よって、ドライブ全体のsdaに案内人を置く必要がある。
 - **詳細**
   - **計算資源（CPU/RAM）**  
     物理マシンの一部を、VirtualBoxが借りて、仮想マシンに分け与えている。
@@ -160,19 +186,21 @@ Debianのパッケージ管理システムにおいて、aptは標準的なイ�
     - ここにOSの本体（/root, /home, /var, swap）が全て格納されている。
     - 物理ディスク上では乱数に見えるため、PC盗難時等の情報漏洩を防ぐ。
 
+&nbsp;  
+
 ## Phase2 
 ### ユーザー、グループ周り
-- sudoインストール:```apt install sudo```、デバッグ:```sudo --version```
+- sudoインストール：```apt install sudo```、デバッグ：```sudo --version```
 - ユーザー作成：```sudo adduser <username>```、デバッグ：```getent passwd <username>```
 - グループ作成：```sudo addgroup <groupname>```、デバッグ：```getent group <groupname>```
 - グループに追加：```sudo adduser <username> <groupname>```  
 ### sshインストールと設定
 1. Concept：セットアップとサーバーデーモンの区別
-- /etc/ssh/ssh_config (Client Side)
+- /etc/ssh/ssh_config (Client Side)  
   自分が他のサーバーへ接続しに行く時の設定。
-- /etc/ssh/sshd_config (Server Daemon Side)
+- /etc/ssh/sshd_config (Server Daemon Side)  
   外部からの接続を受け入れる時の設定。Debianをサーバーとして機能させるための設定。
-- インストール + 有効化：```sudo apt install openssh-server``` デバッグ：```systemctl status ssh```
+- インストール + 有効化：  ```sudo apt install openssh-server``` デバッグ：```systemctl status ssh```
 2. Configuration  
   デーモンにセキュリティを設定する：```sudo vim /etc/ssh/sshd_config```
 - Port 4242：デフォルトの22番は狙われやすいため変更。
@@ -182,8 +210,10 @@ Debianのパッケージ管理システムにおいて、aptは標準的なイ�
   デーモンは起動時にしか設定ファイルを読まないため、書き換えたら再起動して読み直させる。
 4. Port Forwarding
   仮想マシンは「ホストPCの中の隔離された箱」にあるため、そのままでは外から繋がらない。VirtualBoxの設定で、ホストとゲストの間にパイプを通す。
-- Host: 4242 → Guest: 4242  
-  「ホストの4242番ポートに来た通信を、そのままゲストの4242番に転送しろ」という命令。
+- ポートフォワーディング  
+ホストOS（自分のPC）へのアクセスを、仮想マシン（Debian）へ転送するためのルール
+- SSH：Host: 4242 → Guest: 4242
+- Web：Host: 8080 → Guest: 80（ホスト側でのポート競合を防ぐため）
 5. Connection：```ssh yuonishi@localhost -p 4242```、デバッグ：```ssh root@localhost -p 4242```  
   ホストマシンのターミナルから、実際に接続して確認する。
 
@@ -267,6 +297,9 @@ reject_username #ユーザー名を含んでいたら拒否
 enforce_for_root #このルールをRootユーザーにも強制する
 ```
 - デバッグ：```passwd```
+
+&nbsp;  
+
 ## Phase3
 ### monitoring.sh：/usr/local/bin/monitoring.sh
 ここでは、以下のシステム情報を収集し、全端末に通知するBashスクリプトを作成。   
@@ -297,14 +330,19 @@ enforce_for_root #このルールをRootユーザーにも強制する
   Sudoのログファイル（/var/log/sudo/sudo.log）内に記録された "COMMAND" という文字列を含む行を ```grep``` で検索し、その行数を ```wc -l``` でカウントすることで、Sudoコマンドの実行総数を算出。
 13. wall  
   ```echo ""```メッセージを```wall```に渡す。```wall```は、ログインしている全員の画面にブロードキャストする。
+
+&nbsp;  
+
 ## Phase4
 ### Systemd Timer
 - cron vs systemd timer
-  - cron：時計を見て動き、10:08に起動した場合、最初の実行は10:10。
-  - systemed timer：10:08に起動した場合、最初の実行は10:18。　　
-    SystemdはOSの起動プロセスそのものを管理しているため、「OSが立ち上がった瞬間」 を基準に物事を進めるのが得意
+  - cron：  
+  時計を見て動き、10:08に起動した場合、最初の実行は10:10。
+  - systemed timer：  
+    10:08に起動した場合、最初の実行は10:18。  
+    SystemdはOSの起動プロセスそのものを管理しているため、「OSが立ち上がった瞬間」 を基準に物事を進めるのが得意。
 ### systemd Timer の仕組み
-Systemdは 「実行する役割（Service）」 と 「時間を計る役割（Timer）」 を明確に分ける設計思想。
+Systemdは 「実行する役割（Service）」 と 「時間を計る役割（Timer）」 を明確に分ける設計思想。　　
 Systemdで定期実行するには、2つのファイルをペアで作る必要がある。
 - monitoring.service （実行係 / Worker）
   - 何を実行するかだけを知っている。
@@ -363,18 +401,73 @@ sudo systemctl restart monitoring.timer
 4. 再起動して反映```sudo reboot```
 5. デバッグ
 
-## Bonus Part
+&nbsp;  
+&nbsp;  
+&nbsp;  
 
-## 1. Web Server Implementation  
-### Step1.内部（Debian）からLighttpdへのアクセス  
-- apt install lighttpd
-  - デーモン確認：systemctl status lighttpd
-- ufw allow 80
-  - ポートの待ち受け確認：ss -tulpn | grep lighttpd
-- ufw status
-- curl http://localhost
+# Bonus1
 
-### Step 2. 外部（Host OS）からWebサーバーへのアクセス  
+ボーナスでは、Debian上に以下の構成でWebサーバー環境を構築した。
+
+&nbsp;  
+
+## 1. 各サービスの役割
+
+### 1. VirtualBox
+* **役割** 
+  ホストOS（Windows）とゲストOS（Debian）をつなぐ通信の仲介役。
+
+* **設定**  
+  - ポートフォワーディングHost
+    8080 ➡ Guest: 80
+  * **理由**
+    - Host側 (8080):  
+      ホストOSでは標準の80番ポートが他のアプリやシステムで使用済み（競合）の可能性があるため、8080番を入り口として使用する。
+    - Guest側 (80):  
+      仮想マシン内はWebサーバー専用環境であるため、HTTP標準の80番ポートを使用する。
+
+### 2. Lighttpd (Web Server)
+* **役割**  
+  HTTPリクエストを受け取る窓口。静的なHTMLならそのまま返すが、動的な処理（WordPress）が必要な場合はPHPに処理を依頼し、結果をブラウザに返す。
+* **ポート**  
+  80 (HTTP)
+* **設定**  
+  すべてのIPアドレス (0.0.0.0) からの接続を受け付ける設定。
+
+### 3. PHP
+* **役割**  
+  サーバーサイドのプログラミング言語。Lighttpd自体はPHPコードを読めないため、FastCGI モジュールを経由してPHPプロセスがコードを実行・HTML生成を行う。
+* **連携**  
+  Lighttpd と連携して動作する。
+
+### 4. MariaDB (データベースサーバー)
+* **役割**  
+  データの保存場所。WordPressの記事、パスワード、サイト設定等はここに保存する。
+  PHPからのリクエスト（SQLクエリ）に対してデータを返却する。
+* **ポート**  
+  3306
+* **設定**  
+  127.0.0.1 (Localhost) からの接続のみを許可。
+  * **理由**  
+    SSH(0.0.0.0)と異なり、データベースは外部公開する必要がない。内部のWordPressから接続できれば十分であるため、セキュリティのために外部アクセスを遮断している。
+
+### 5. WordPress (アプリケーション)
+* **役割**  
+  PHPで開発されたコンテンツ管理システムで、データベースへの接続情報（wp-config.php）を持つ。  
+  wp-config.php に記述された認証情報を用いてMariaDBに接続し、Webページを構築する。
+
+&nbsp;  
+
+## 2. 実装手順
+### Phase 1: ウェブサーバー (Lighttpd)
+- インストール：```apt install lighttpd```
+  - デーモン確認：```systemctl status lighttpd```
+- Webサーバーの標準ポートである 80番 (HTTP) への外部接続を許可：```ufw allow 80```
+  - ポートの待ち受け確認：```ss -tanp```
+- ルール追加のデバッグ：```ufw status```
+- CUI上でのデバッグ：```curl -v http://localhost:80```
+
+### Phase 2. 外部（Host OS）からWebサーバーへのアクセス  
 Webサーバーが正常に稼働していても、ネットワーク設定が不十分だと外部から閲覧できない。  　
 VirtualBoxのポートフォワーディング機能を使用して、ホストマシンと仮想マシン間の通信経路を確立する。
 
@@ -389,61 +482,98 @@ VirtualBoxのポートフォワーディング機能を使用して、ホスト�
    - **URL:** `http://localhost:8080`  
    - **Validation:** "Placeholder page" が表示されれば、Webサーバーの公開設定は完了。  
 
----
+&nbsp;  
 
-## 2. Database Implementation (MariaDB)
-WordPressのデータを管理・保存するために、RDBMS（リレーショナルデータベース管理システム）である **MariaDB** を採用した。
+### Phase 3: MariaDB
+1. MariaDBをインストール、デーモンとする。```systemctl status mariadb```
+2. セキュリティ設定。```mariadb-secure-installation```
+- DB管理者のパスワード設定
+- リモートログイン禁止
+3. 通信状態の確認```sudo ss -tanp```  
+```
+# 以下、出力結果
+LISTEN  0       80             127.0.0.1:3306          0.0.0.0:*       users:(("mariadbd",pid=1165,fd=28))   
+```
+- Listen：待機中
+- `127.0.0.1:3306`：localhostからのアクセスだけを「3306番ポート」で受け付ける
+4. データベースとユーザーの作成（SQL）
+- 管理者ログイン```sudo mariadb```
 
-### MariaDB
-- **目的** WordPressの投稿データ、設定情報、ユーザー認証情報などを永続的に保存する。Webサーバー（Lighttpd）からのリクエストに応じ、必要なデータを検索・提供するバックエンドの役割を担う。
-- **セキュリティ設定** インストール直後のデフォルト設定はセキュリティが低いため、専用スクリプトを用いて堅牢化を行った。最新のDebian環境に合わせ、コマンドは `mariadb-secure-installation` を使用。
-  - **匿名ユーザーの削除**: 誰でもログインできる不要なアカウントを削除。
-  - **リモートRootログインの禁止**: 管理者権限（Root）でのログインをローカル（localhost）のみに制限し、外部からの攻撃を防ぐ。
+```
+CREATE DATABASE wordpress_db; #データベースの作成
+CREATE USER 'yuonishi'@'localhost' IDENTIFIED BY 'Yuto09050024'; #ユーザーの作成
+GRANT ALL PRIVILEGES ON wordpress_db.* TO 'yuonishi'@'localhost'; #ユーザーに、その箱だけの全権限を与える
+FLUSH PRIVILEGES; #権限設定を即座に反映させる
+EXIT; #ログアウト
+```
+- デバッグ：```mariadb -u yuonishi -p```
 
-### Implementation Steps
-1. **Installation**
-   ```bash
-   sudo apt install mariadb-server -y
+&nbsp;  
 
+### Phase 4: wordpress
+1. wordpress本体の配置
+空のweb公開ディレクトリに、WordPressのプログラムを置く。  
+- 目的：Webサーバーがブラウザに表示するための「中身」を用意する。  
+- 連携：Lighttpdは /var/www/html という場所にあるファイルしか表示しない。故にココに置く。  
+ - インストール ```sudo apt install wget unzip -y```
+ - ディレクトリ移動 ```cd /var/www/html```
+ - 不要なファイル削除 ```rm index.lighttpd.html```
+ - WordPressダウンロード ```sudo wget https://wordpress.org/latest.zip```
+ - 解凍 ```sudo unzip latest.zip```
+ - フォルダから出す ```sudo mv wordpress/* .```
+ - ゴミ捨て ```sudo rmdir wordpress, sudo rm latest.zip```
+2. 設定ファイルの編集
+WordPressは、初期状態ではMariaDBの場所を知らない。MariaDBのID、パスワードを用い、この倉庫へのログイン方法を示す設定ファイルを作る。　　
+- 目的：WordPress（アプリ）とMariaDB（データベース）を接続させる。
+- 連携：ここで記述するパスワードを使って、WordPressがMariaDBにログインする。
+以下のように、サンプルファイルをコピーし本番用ファイルにする。そして、DB名、ユーザー名、パスワード編集。
+```
+cp wp-config-sample.php wp-config.php
+```
 
-  ---
+&nbsp;  
+&nbsp;  
+&nbsp;  
 
-  ### Database Configuration (SQL)
-WordPress用のデータベースと専有ユーザーを作成し、権限を付与した。
+# Bonus2
 
-1. **Create Database & User**
-   MariaDBコンソールにログインし、以下のSQLコマンドを実行。
-   ```sql
-   /* 1. Database作成 */
-   CREATE DATABASE wordpress_db;
-   
-   /* 2. User作成 (パスワードは適切に設定) */
-   CREATE USER 'wp_user'@'localhost' IDENTIFIED BY 'password123';
-   
-   /* 3. 権限付与 (WordPressDBへの全権限をwp_userに与える) */
-   GRANT ALL PRIVILEGES ON wordpress_db.* TO 'wp_user'@'localhost';
-   
-   /* 4. 設定反映 */
-   FLUSH PRIVILEGES;
+## fail2ban
 
-## 3. PHP Implementation (Processor)
-WordPressはPHP言語で記述された動的なCMSであるため、WebサーバーがPHPコードを解釈・実行できる環境を構築した。
+- **役割**
+  システムをブルートフォース攻撃（総当たり攻撃）から保護するため。特にSSHポート（4242）への不正アクセス試行を監視し、攻撃者を自動的にブロックすることでセキュリティを強化する。
 
-### PHP Components
-- **php-cgi**
-  - **目的:** Lighttpd上でPHPを実行するためのFastCGI対応インタプリタ。Webサーバーからのリクエストを受け取り、PHPスクリプトを処理してHTMLを生成する。
-- **php-mysql**
-  - **目的:** PHPアプリケーション（WordPress）がバックエンドのデータベース（MariaDB）と通信するためのドライバモジュール。
+- **仕組み**  
+    - ログファイル（/var/log/auth.log）を常時監視するプロセス。
+    - 指定された条件に一致するアクセスを検知する。
+    - UFWを操作し、攻撃元のIPアドレスからの接続を一定時間（10分間）遮断する。
+- Configuration (設定値):`/etc/fail2ban/jail.local` の [sshd] セクションを編集
+  - Port: 4242 (SSH)
+  - Max Retry: 3 times (3回失敗でBAN)
+  - Find Time: 120 seconds (2分間の監視)
+  - Ban Time: 600 seconds (10分間の遮断)
+- デバッグ  
+ホストOS（攻撃者）からわざとパスワードを間違え、ゲストOS（サーバー）が接続を拒否することを確認する。
+1. Host OS：  
+  ホストOSのターミナルから、存在しないユーザーや間違ったパスワードでログインを3回試行する。
+```bash
+ssh testuser@localhost -p 4242 
+```
+2. Guest OS：
+  ゲストOS側でBANされたIPリストを確認する。
+```bash
+sudo fail2ban-client status sshd
+```
+`Banned IP list: 10.0.2.2 (ホストOSのIP) `が表示されれば成功
+3. BANを手動で解除
+```bash
+sudo fail2ban-client set sshd unbanip 10.0.2.2
+```
 
-### Implementation Steps
-1. **Installation**
-   必要なパッケージを一括インストール。
-   ```bash
-   sudo apt install php-cgi php-mysql -y
-
----
+&nbsp;  
+&nbsp;  
 
 # Resources
-[Markdown記法 チートシート - Qiita](https://qiita.com/Qiita/items/c686397e4a0f4f11683d)
-[Linuxのディストリビューション比較](https://eng-entrance.com/linux-distribution-compare)
-[DACとMAC、RBACの違い](https://qiita.com/miyuki_samitani/items/acde77784237e482aef8)
+[Markdown記法 チートシート - Qiita](https://qiita.com/Qiita/items/c686397e4a0f4f11683d)  
+[Linuxのディストリビューション比較](https://eng-entrance.com/linux-distribution-compare)  
+[DACとMAC、RBACの違い](https://qiita.com/miyuki_samitani/items/acde77784237e482aef8)  
+[5分で理解するfail2ban](https://qiita.com/Brutus/items/28f4dc2054ad7de54e73)
